@@ -240,7 +240,10 @@ def confirm_destruction(disks: list[dict], use_precond: bool, force: bool) -> No
     )
     console.print()
 
-    answer = input("  > ").strip().lower()
+    try:
+        answer = input("  > ").strip().lower()
+    except (UnicodeDecodeError, EOFError):
+        answer = ""
 
     if answer != "y":
         console.print("\n[green]Отмена. Данные на дисках сохранены.[/green]")
