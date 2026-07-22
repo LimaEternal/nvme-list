@@ -7,6 +7,7 @@
 import re
 from datetime import datetime
 from pathlib import Path
+from typing import List, Optional, Union
 
 
 def _strip_rich(text: str) -> str:
@@ -15,9 +16,9 @@ def _strip_rich(text: str) -> str:
 
 
 def generate_report(
-    disks: list[dict],
-    results: list[dict],
-    output_path: str | Path | None = None,
+    disks: List[dict],
+    results: List[dict],
+    output_path: Optional[Union[str, Path]] = None,
 ) -> Path:
     """
     Генерирует MD-файл с таблицей результатов.

@@ -7,9 +7,10 @@
 
 import json
 import subprocess
+from typing import Dict, List, Optional
 
 
-def _detect_interface(disk_name: str, raw_tran: str | None) -> str:
+def _detect_interface(disk_name: str, raw_tran: Optional[str]) -> str:
     """
     Определяет тип интерфейса диска.
 
@@ -24,7 +25,7 @@ def _detect_interface(disk_name: str, raw_tran: str | None) -> str:
     return tran
 
 
-def get_non_system_disks(known_interfaces: dict) -> list[dict]:
+def get_non_system_disks(known_interfaces: Dict[str, list]) -> List[dict]:
     """
     Сканирует систему и возвращает список несистемных дисков.
 
