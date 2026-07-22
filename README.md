@@ -1,1 +1,1 @@
-sdfdsjfldskfjldsfjdsljdsflkdsjfldkjdslfdslfdsjflkj
+тут пока что пусто, доку по использованию напишу потом, техническое задание лежит в приватном файле
