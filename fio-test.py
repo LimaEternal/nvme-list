@@ -80,7 +80,7 @@ def parse_args() -> argparse.Namespace:
         "--output",
         type=str,
         default=None,
-        help="Путь для MD-отчёта (по умолчанию: fio_report_<timestamp>.md)",
+        help="Путь для MD-отчёта (по умолчанию: reports/fio_report_<timestamp>.md)",
     )
 
     parser.add_argument(
@@ -339,6 +339,7 @@ def main() -> None:
                     "bw": "...",
                     "lat_avg": "...",
                     "lat_p99": "...",
+                    "error_msg": None,
                 })
                 live.update(build_table(results))
 
@@ -364,6 +365,7 @@ def main() -> None:
                     results[idx]["bw"] = "—"
                     results[idx]["lat_avg"] = "—"
                     results[idx]["lat_p99"] = "—"
+                    results[idx]["error_msg"] = res["error"]
                 else:
                     results[idx]["test_name"] = (
                         f"[green]✅ {t['name']}[/green]"

@@ -4,8 +4,14 @@
 Создаёт Markdown-файл с таблицами, удобный для чтения и публикации.
 """
 
+import re
 from datetime import datetime
 from pathlib import Path
+
+
+def _strip_rich(text: str) -> str:
+    """Удаляет rich-разметку [tag]...[/tag] из строки."""
+    return re.sub(r"\[.*?\]", "", text)
 
 
 def generate_report(
@@ -25,10 +31,13 @@ def generate_report(
         Path к созданному файлу
     """
     if output_path is None:
+        reports_dir = Path("reports")
+        reports_dir.mkdir(exist_ok=True)
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        output_path = Path(f"fio_report_{timestamp}.md")
+        output_path = reports_dir / f"fio_report_{timestamp}.md"
     else:
         output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
 
     lines = []
 
@@ -62,22 +71,23 @@ def generate_report(
             lines.append(f"### /dev/{disk_key} ({r['model']})")
             lines.append("")
             lines.append(
-                "| Тест | IOPS | Скорость (МБ/с) | Lat Avg (мс) | Lat p99 (мс) |"
+                "| Тест | IOPS | Скорость (МБ/с) | Lat Avg (мс) | Lat p99 (мс) | Ошибка |"
             )
             lines.append(
-                "|------|------|-----------------|--------------|--------------|"
+                "|------|------|-----------------|--------------|--------------|--------|"
             )
 
         status = "OK" if not r.get("error") else "ERROR"
 
         if r.get("error"):
+            err = r.get("error_msg", "Unknown")
             lines.append(
-                f"| {r['test_name']} | {status} | — | — | — |"
+                f"| {_strip_rich(r['test_name'])} | {status} | — | — | — | {err} |"
             )
         else:
             lines.append(
-                f"| {r['test_name']} | {r['iops']} | {r['bw']} "
-                f"| {r['lat_avg']} | {r['lat_p99']} |"
+                f"| {_strip_rich(r['test_name'])} | {r['iops']} | {r['bw']} "
+                f"| {r['lat_avg']} | {r['lat_p99']} | — |"
             )
 
     lines.append("")
