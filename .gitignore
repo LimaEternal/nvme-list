@@ -1,3 +1,5 @@
 SPEC.md
 __pycache__/
 ./venv
+./tools
+./nvk/nvk_ai_chat.md
