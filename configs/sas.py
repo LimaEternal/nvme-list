@@ -38,3 +38,10 @@ DESCRIPTION = (
     "Случайный доступ: 2 потока (QD64) — сбалансированный профиль. "
     "Последовательный: bs=64k."
 )
+
+THRESHOLDS = {
+    "seq_read":  {"min_bw_mb": 800},
+    "seq_write": {"min_bw_mb": 600},
+    "rand_read": {"min_iops": 30000},
+    "rand_write": {"min_iops": 25000},
+}

@@ -38,3 +38,10 @@ DESCRIPTION = (
     "Случайный доступ: строго 1 поток (QD32) — многопоточность вредит. "
     "Последовательный: bs=64k."
 )
+
+THRESHOLDS = {
+    "seq_read":  {"min_bw_mb": 400},
+    "seq_write": {"min_bw_mb": 300},
+    "rand_read": {"min_iops": 10000},
+    "rand_write": {"min_iops": 8000},
+}

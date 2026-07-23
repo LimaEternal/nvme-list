@@ -46,6 +46,12 @@ INTERFACE_DESCRIPTIONS = {
     "SATA": sata.DESCRIPTION,
 }
 
+INTERFACE_THRESHOLDS = {
+    "NVME": nvme.THRESHOLDS,
+    "SAS": sas.THRESHOLDS,
+    "SATA": sata.THRESHOLDS,
+}
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -56,6 +62,7 @@ def parse_args() -> argparse.Namespace:
             "  python fio-test.py                  — базовое тестирование\n"
             "  python fio-test.py --precond         — с прекондишнингом\n"
             "  python fio-test.py --output my.md    — свой путь для отчёта\n"
+            "  python fio-test.py --threshold-nvme 2000,1500,100000,80000\n"
         ),
     )
 
@@ -83,7 +90,70 @@ def parse_args() -> argparse.Namespace:
         help="Длительность каждого теста в секундах (по умолчанию: 30)",
     )
 
+    parser.add_argument(
+        "--threshold-nvme",
+        type=str,
+        default=None,
+        help="Свои пороги для NVMe: seq_read_bw,seq_write_bw,rand_read_iops,rand_write_iops (через запятую)",
+    )
+
+    parser.add_argument(
+        "--threshold-sas",
+        type=str,
+        default=None,
+        help="Свои пороги для SAS: seq_read_bw,seq_write_bw,rand_read_iops,rand_write_iops (через запятую)",
+    )
+
+    parser.add_argument(
+        "--threshold-sata",
+        type=str,
+        default=None,
+        help="Свои пороги для SATA: seq_read_bw,seq_write_bw,rand_read_iops,rand_write_iops (через запятую)",
+    )
+
     return parser.parse_args()
+
+
+def check_threshold(test_id: str, res: dict, thresholds: dict) -> str:
+    """Проверяет, прошёл ли тест пороговое значение. Возвращает 'done' или 'undone'."""
+    if "error" in res:
+        return "undone"
+
+    t = thresholds.get(test_id, {})
+
+    if "min_bw_mb" in t:
+        if res["bw_mb"] < t["min_bw_mb"]:
+            return "undone"
+
+    if "min_iops" in t:
+        if res["iops"] < t["min_iops"]:
+            return "undone"
+
+    return "done"
+
+
+def parse_custom_thresholds(raw: str) -> dict:
+    """
+    Парсит строку с порогами: seq_read_bw,seq_write_bw,rand_read_iops,rand_write_iops
+    Возвращает словарь THRESHOLDS.
+    """
+    vals = [x.strip() for x in raw.split(",")]
+    if len(vals) != 4:
+        console.print("[red]Ошибка: нужно ровно 4 значения через запятую[/red]")
+        sys.exit(1)
+
+    try:
+        seq_read_bw, seq_write_bw, rand_read_iops, rand_write_iops = [float(v) for v in vals]
+    except ValueError:
+        console.print("[red]Ошибка: все значения должны быть числами[/red]")
+        sys.exit(1)
+
+    return {
+        "seq_read":  {"min_bw_mb": seq_read_bw},
+        "seq_write": {"min_bw_mb": seq_write_bw},
+        "rand_read": {"min_iops": rand_read_iops},
+        "rand_write": {"min_iops": rand_write_iops},
+    }
 
 
 def run_fio_test(disk_info: dict, test_id: str, base_args: list[str]) -> dict:
@@ -173,8 +243,17 @@ def build_table(results: list[dict]) -> Table:
     table.add_column("Скорость (МБ/с)", justify="right", style="green")
     table.add_column("Lat Avg (мс)", justify="right")
     table.add_column("Lat p99 (мс)", justify="right")
+    table.add_column("Статус", justify="center")
 
     for r in results:
+        status = r.get("status", "...")
+        if status == "done":
+            status_style = "[bold green]done[/bold green]"
+        elif status == "undone":
+            status_style = "[bold red]undone[/bold red]"
+        else:
+            status_style = status
+
         table.add_row(
             r["disk"],
             f"{r['model']}\n[grey50]SN: {r['serial']}[/grey50]",
@@ -184,6 +263,7 @@ def build_table(results: list[dict]) -> Table:
             str(r["bw"]),
             str(r["lat_avg"]),
             str(r["lat_p99"]),
+            status_style,
         )
 
     return table
@@ -191,6 +271,15 @@ def build_table(results: list[dict]) -> Table:
 
 def main() -> None:
     args = parse_args()
+
+    thresholds = dict(INTERFACE_THRESHOLDS)
+
+    if args.threshold_nvme:
+        thresholds["NVME"] = parse_custom_thresholds(args.threshold_nvme)
+    if args.threshold_sas:
+        thresholds["SAS"] = parse_custom_thresholds(args.threshold_sas)
+    if args.threshold_sata:
+        thresholds["SATA"] = parse_custom_thresholds(args.threshold_sata)
 
     console.print("[bold blue]Сканирование системы на несистемные диски...[/bold blue]")
     disks = get_non_system_disks(INTERFACE_CONFIGS)
@@ -276,6 +365,7 @@ def main() -> None:
                     "lat_p99": "...",
                     "error_msg": None,
                     "bs": "...",
+                    "status": "...",
                 })
                 live.update(build_table(results))
 
@@ -309,6 +399,7 @@ def main() -> None:
                     results[idx]["lat_p99"] = "—"
                     results[idx]["error_msg"] = res["error"]
                     results[idx]["bs"] = bs
+                    results[idx]["status"] = "undone"
                 else:
                     results[idx]["test_name"] = (
                         f"[green]✅ {t['name']}[/green]"
@@ -319,6 +410,9 @@ def main() -> None:
                     results[idx]["lat_p99"] = res["lat_p99"]
                     results[idx]["error_msg"] = None
                     results[idx]["bs"] = bs
+                    results[idx]["status"] = check_threshold(
+                        t["id"], res, thresholds[disk["tran"]]
+                    )
 
                 live.update(build_table(results))
                 progress.advance(overall)
