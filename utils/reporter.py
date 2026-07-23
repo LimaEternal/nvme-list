@@ -72,10 +72,10 @@ def generate_report(
             lines.append(f"### /dev/{disk_key} ({r['model']})")
             lines.append("")
             lines.append(
-                "| Тест | IOPS | Скорость (МБ/с) | Lat Avg (мс) | Lat p99 (мс) | Ошибка |"
+                "| Тест | Блок | IOPS | Скорость (МБ/с) | Lat Avg (мс) | Lat p99 (мс) | Ошибка |"
             )
             lines.append(
-                "|------|------|-----------------|--------------|--------------|--------|"
+                "|------|------|------|-----------------|--------------|--------------|--------|"
             )
 
         status = "OK" if not r.get("error") else "ERROR"
@@ -83,11 +83,11 @@ def generate_report(
         if r.get("error"):
             err = r.get("error_msg", "Unknown")
             lines.append(
-                f"| {_strip_rich(r['test_name'])} | {status} | — | — | — | {err} |"
+                f"| {_strip_rich(r['test_name'])} | {r.get('bs', '—')} | {status} | — | — | — | {err} |"
             )
         else:
             lines.append(
-                f"| {_strip_rich(r['test_name'])} | {r['iops']} | {r['bw']} "
+                f"| {_strip_rich(r['test_name'])} | {r.get('bs', '—')} | {r['iops']} | {r['bw']} "
                 f"| {r['lat_avg']} | {r['lat_p99']} | — |"
             )
 

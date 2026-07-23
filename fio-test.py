@@ -56,7 +56,6 @@ def parse_args() -> argparse.Namespace:
             "  python fio-test.py                  — базовое тестирование\n"
             "  python fio-test.py --precond         — с прекондишнингом\n"
             "  python fio-test.py --output my.md    — свой путь для отчёта\n"
-            "  python fio-test.py --yes             — без запроса подтверждения\n"
         ),
     )
 
@@ -68,12 +67,6 @@ def parse_args() -> argparse.Namespace:
             "Стабилизирует производительность SSD, но затирает все данные. "
             "Запись идёт блоком bs=1M напрямую на устройство (--direct=1)."
         ),
-    )
-
-    parser.add_argument(
-        "--yes", "-y",
-        action="store_true",
-        help="Пропустить запрос подтверждения (для автоматизации на стенде)",
     )
 
     parser.add_argument(
@@ -196,62 +189,6 @@ def build_table(results: list[dict]) -> Table:
     return table
 
 
-def confirm_destruction(disks: list[dict], use_precond: bool, force: bool) -> None:
-    """
-    Предупреждает о потере данных и запрашивает подтверждение.
-
-    Тесты write на блочном устройстве уничтожают данные без возможности
-    восстановления. Пользователь должен явно подтвердить запуск.
-    """
-    console.print()
-    console.print("[bold red]═══════════════════════════════════════════════════════════[/bold red]")
-    console.print("[bold red]  ВНИМАНИЕ: ТЕСТИРОВАНИЕ УНИЧТОЖИТ ДАННЫЕ НА ДИСКАХ[/bold red]")
-    console.print("[bold red]═══════════════════════════════════════════════════════════[/bold red]")
-    console.print()
-    console.print("[bold red]FIO записывает напрямую в блочные устройства (/dev/*).[/bold red]")
-    console.print("[bold red]Тесты seq_write и rand_write перезапишут данные на дисках.[/bold red]")
-    console.print("[bold red]Восстановление данных будет невозможным![/bold red]")
-
-    if use_precond:
-        console.print()
-        console.print("[bold red]Плюс: прекондишнинг запишет 100% объёма каждого диска![/bold red]")
-
-    console.print()
-    console.print("[yellow]Целевые диски:[/yellow]")
-
-    for d in disks:
-        console.print(
-            f"  [cyan]/dev/{d['name']}[/cyan] — {d['model']} "
-            f"({d['tran']}, {d['size']})"
-        )
-
-    console.print()
-
-    if force:
-        console.print("[yellow]Флаг --yes: подтверждение пропущено.[/yellow]")
-        return
-
-    console.print(
-        "[bold red]Введите [y] для запуска тестов "
-        "(данные будут затерты)[/bold red]"
-    )
-    console.print(
-        "[green]Нажмите любую другую клавишу для отмены (данные сохранятся)[/green]"
-    )
-    console.print()
-
-    try:
-        answer = input("  > ").strip().lower()
-    except (UnicodeDecodeError, EOFError):
-        answer = ""
-
-    if answer != "y":
-        console.print("\n[green]Отмена. Данные на дисках сохранены.[/green]")
-        sys.exit(0)
-
-    console.print()
-
-
 def main() -> None:
     args = parse_args()
 
@@ -274,8 +211,6 @@ def main() -> None:
         if desc:
             console.print(f"    [grey50]{desc}[/grey50]")
     console.print()
-
-    confirm_destruction(disks, args.precond, args.yes)
 
     if args.precond:
         console.print(
@@ -340,6 +275,7 @@ def main() -> None:
                     "lat_avg": "...",
                     "lat_p99": "...",
                     "error_msg": None,
+                    "bs": "...",
                 })
                 live.update(build_table(results))
 
@@ -357,6 +293,12 @@ def main() -> None:
 
                 res = run_fio_test(disk, t["id"], fio_args)
 
+                bs = "4k"
+                for a in fio_args:
+                    if a.startswith("--bs="):
+                        bs = a.split("=", 1)[1]
+                        break
+
                 if "error" in res:
                     results[idx]["test_name"] = (
                         f"[red]❌ {t['name']}[/red]"
@@ -366,6 +308,7 @@ def main() -> None:
                     results[idx]["lat_avg"] = "—"
                     results[idx]["lat_p99"] = "—"
                     results[idx]["error_msg"] = res["error"]
+                    results[idx]["bs"] = bs
                 else:
                     results[idx]["test_name"] = (
                         f"[green]✅ {t['name']}[/green]"
@@ -374,6 +317,8 @@ def main() -> None:
                     results[idx]["bw"] = res["bw_mb"]
                     results[idx]["lat_avg"] = res["lat_avg"]
                     results[idx]["lat_p99"] = res["lat_p99"]
+                    results[idx]["error_msg"] = None
+                    results[idx]["bs"] = bs
 
                 live.update(build_table(results))
                 progress.advance(overall)
